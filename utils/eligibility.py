@@ -9,16 +9,19 @@ It does NOT parse free-form eligibility text.
 """
 
 
-
 def normalize_text(value):
-    """
-    Normalize text for simple deterministic comparisons.
-    """
+    """Normalize text for deterministic comparisons."""
+
     if value is None:
         return ""
 
-    return str(value).strip().lower().replace("-", "_").replace(" ", "_")
-
+    return (
+        str(value)
+        .strip()
+        .lower()
+        .replace("-", "_")
+        .replace(" ", "_")
+    )
 
 
 def evaluate_eligibility(user_profile, scheme):
@@ -28,9 +31,9 @@ def evaluate_eligibility(user_profile, scheme):
 
     Returns:
         {
-            "status": "likely_eligible" |
-                      "potentially_eligible" |
-                      "not_eligible",
+            "status": "likely_eligible"
+                      | "potentially_eligible"
+                      | "not_eligible",
             "passed": [],
             "failed": [],
             "unknown": [],
@@ -56,42 +59,48 @@ def evaluate_eligibility(user_profile, scheme):
     if min_age is not None:
 
         if user_age is None:
+
             unknown.append(
-                f"Age must be verified because the minimum age is {min_age}."
+                f"Age is required to verify the minimum age of {min_age}."
             )
-            missing_information.append("age")
+
+            if "age" not in missing_information:
+                missing_information.append("age")
 
         elif user_age < min_age:
+
             failed.append(
-                f"Minimum age requirement is {min_age}."
+                f"Age is below the minimum required age of {min_age}."
             )
 
         else:
+
             passed.append(
-                f"Age satisfies the minimum age requirement of {min_age}."
+                f"Age satisfies the minimum requirement of {min_age}."
             )
 
     if max_age is not None:
 
         if user_age is None:
 
+            unknown.append(
+                f"Age is required to verify the maximum age of {max_age}."
+            )
+
             if "age" not in missing_information:
                 missing_information.append("age")
 
-            unknown.append(
-                f"Age must be verified because the maximum age is {max_age}."
-            )
-
         elif user_age > max_age:
+
             failed.append(
-                f"Maximum age requirement is {max_age}."
+                f"Age exceeds the maximum allowed age of {max_age}."
             )
 
         else:
-            passed.append(
-                f"Age is within the maximum age limit of {max_age}."
-            )
 
+            passed.append(
+                f"Age is within the maximum limit of {max_age}."
+            )
 
     # ---------------------------------------------------------
     # INCOME
@@ -105,11 +114,12 @@ def evaluate_eligibility(user_profile, scheme):
         if user_income is None:
 
             unknown.append(
-                f"Annual income must be provided to check the "
-                f"maximum income limit of ₹{max_income:,.0f}."
+                f"Annual income is required to verify the maximum "
+                f"income limit of ₹{max_income:,.0f}."
             )
 
-            missing_information.append("annual_income")
+            if "annual_income" not in missing_information:
+                missing_information.append("annual_income")
 
         elif user_income > max_income:
 
@@ -125,7 +135,6 @@ def evaluate_eligibility(user_profile, scheme):
                 f"₹{max_income:,.0f}."
             )
 
-
     # ---------------------------------------------------------
     # OCCUPATION
     # ---------------------------------------------------------
@@ -137,23 +146,24 @@ def evaluate_eligibility(user_profile, scheme):
 
     if allowed_occupations:
 
-        normalized_allowed = [
+        normalized_allowed = {
             normalize_text(value)
             for value in allowed_occupations
-        ]
+        }
 
         if not user_occupation:
 
             unknown.append(
-                "Occupation is required to check the occupation-specific requirement."
+                "Occupation is required to verify the occupation-specific requirement."
             )
 
-            missing_information.append("occupation")
+            if "occupation" not in missing_information:
+                missing_information.append("occupation")
 
         elif user_occupation in normalized_allowed:
 
             passed.append(
-                "Occupation matches the scheme's target occupation."
+                "Occupation matches the scheme's specified occupation."
             )
 
         else:
@@ -161,7 +171,6 @@ def evaluate_eligibility(user_profile, scheme):
             failed.append(
                 "Occupation does not match the scheme's specified occupation requirement."
             )
-
 
     # ---------------------------------------------------------
     # GENDER
@@ -185,20 +194,21 @@ def evaluate_eligibility(user_profile, scheme):
                 "Gender is required to determine this eligibility condition."
             )
 
-            missing_information.append("gender")
+            if "gender" not in missing_information:
+                missing_information.append("gender")
 
-        elif user_gender == normalized_required_gender:
+        elif user_gender != normalized_required_gender:
 
-            passed.append(
-                "Gender requirement is satisfied."
+            failed.append(
+                f"Gender does not match the required gender "
+                f"({required_gender})."
             )
 
         else:
 
-            failed.append(
-                "Gender does not match the scheme's specified requirement."
+            passed.append(
+                "Gender requirement is satisfied."
             )
-
 
     # ---------------------------------------------------------
     # LANDHOLDING
@@ -217,23 +227,23 @@ def evaluate_eligibility(user_profile, scheme):
         if has_landholding is None:
 
             unknown.append(
-                "Landholding status is required to determine eligibility."
+                "Agricultural landholding status is required."
             )
 
-            missing_information.append("has_landholding")
+            if "has_landholding" not in missing_information:
+                missing_information.append("has_landholding")
 
         elif has_landholding is True:
 
             passed.append(
-                "Required landholding condition is satisfied."
+                "Required agricultural landholding condition is satisfied."
             )
 
         else:
 
             failed.append(
-                "The required landholding condition is not satisfied."
+                "The required agricultural landholding condition is not satisfied."
             )
-
 
     # ---------------------------------------------------------
     # DISABILITY
@@ -256,10 +266,11 @@ def evaluate_eligibility(user_profile, scheme):
         if has_disability is None:
 
             unknown.append(
-                "Disability status is required to determine eligibility."
+                "Disability status is required."
             )
 
-            missing_information.append("has_disability")
+            if "has_disability" not in missing_information:
+                missing_information.append("has_disability")
 
         elif has_disability is False:
 
@@ -282,16 +293,23 @@ def evaluate_eligibility(user_profile, scheme):
                 if disability_percentage is None:
 
                     unknown.append(
-                        f"Disability percentage must be provided to check "
+                        f"Disability percentage is required to verify "
                         f"the minimum requirement of "
                         f"{min_disability_percentage}%."
                     )
 
-                    missing_information.append(
+                    if (
                         "disability_percentage"
-                    )
+                        not in missing_information
+                    ):
+                        missing_information.append(
+                            "disability_percentage"
+                        )
 
-                elif disability_percentage < min_disability_percentage:
+                elif (
+                    disability_percentage
+                    < min_disability_percentage
+                ):
 
                     failed.append(
                         f"Disability percentage is below the required "
@@ -304,7 +322,6 @@ def evaluate_eligibility(user_profile, scheme):
                         f"Disability percentage satisfies the minimum "
                         f"requirement of {min_disability_percentage}%."
                     )
-
 
     # ---------------------------------------------------------
     # EXISTING BUSINESS
@@ -323,12 +340,13 @@ def evaluate_eligibility(user_profile, scheme):
         if has_existing_business is None:
 
             unknown.append(
-                "Existing business status is required to determine eligibility."
+                "Existing business status is required."
             )
 
-            missing_information.append(
-                "has_existing_business"
-            )
+            if "has_existing_business" not in missing_information:
+                missing_information.append(
+                    "has_existing_business"
+                )
 
         elif has_existing_business is True:
 
@@ -341,7 +359,6 @@ def evaluate_eligibility(user_profile, scheme):
             failed.append(
                 "The scheme requires an existing business."
             )
-
 
     # ---------------------------------------------------------
     # NO EXISTING HOUSE
@@ -360,17 +377,19 @@ def evaluate_eligibility(user_profile, scheme):
         if owns_house is None:
 
             unknown.append(
-                "House ownership status is required to determine eligibility."
+                "House ownership status is required."
             )
 
-            missing_information.append(
-                "owns_house"
-            )
+            if "owns_house" not in missing_information:
+                missing_information.append(
+                    "owns_house"
+                )
 
         elif owns_house is True:
 
             failed.append(
-                "The user owns a house, while the scheme requires no existing house."
+                "The user owns a house, while the scheme requires "
+                "the beneficiary not to own an existing house."
             )
 
         else:
@@ -378,7 +397,6 @@ def evaluate_eligibility(user_profile, scheme):
             passed.append(
                 "No existing house condition is satisfied."
             )
-
 
     # ---------------------------------------------------------
     # FINAL STATUS
@@ -396,7 +414,6 @@ def evaluate_eligibility(user_profile, scheme):
 
         status = "likely_eligible"
 
-
     return {
         "status": status,
         "passed": passed,
@@ -406,7 +423,6 @@ def evaluate_eligibility(user_profile, scheme):
             dict.fromkeys(missing_information)
         )
     }
-
 
 
 def get_eligibility_summary(result):
@@ -426,8 +442,8 @@ def get_eligibility_summary(result):
     if status == "potentially_eligible":
 
         return (
-            "Potentially eligible — some information is still "
-            "required to determine eligibility."
+            "Potentially eligible — some required information "
+            "is still needed to determine eligibility."
         )
 
     if status == "not_eligible":
