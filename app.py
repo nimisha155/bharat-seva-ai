@@ -16,7 +16,6 @@ st.set_page_config(
     layout="centered"
 )
 
-
 MODEL_NAME = "gemini-2.5-flash"
 TOP_K_SCHEMES = 3
 
@@ -102,7 +101,6 @@ NO_CONTEXT_MESSAGE = (
 # =========================================================
 
 def get_gemini_client():
-
     api_key = st.secrets.get("GEMINI_API_KEY")
 
     if not api_key:
@@ -243,7 +241,6 @@ st.divider()
 # =========================================================
 
 if "messages" not in st.session_state:
-
     st.session_state.messages = []
 
 
@@ -651,7 +648,6 @@ if user_question:
                     if specific_scheme_id:
 
                         matching_scheme = None
-                        other_schemes = []
 
                         for item in retrieved_schemes:
 
@@ -661,21 +657,15 @@ if user_question:
                             ):
 
                                 matching_scheme = item
-
-                            else:
-
-                                other_schemes.append(item)
+                                break
 
                         if matching_scheme:
-                             # For a specific scheme question, show only
-                              # the explicitly requested scheme.
-                               retrieved_schemes = [  matching_scheme ]
-   
-      
-   
-   
 
-   
+                            # For a specific scheme question,
+                            # show only the explicitly requested scheme.
+                            retrieved_schemes = [
+                                matching_scheme
+                            ]
 
 
                 # =================================================
@@ -736,164 +726,126 @@ if user_question:
 
 
                     # =================================================
-                    # ELIGIBILITY OVERVIEW
+                    # EXPLAINABLE ELIGIBILITY OVERVIEW
                     # =================================================
 
-                    # =================================================
-# EXPLAINABLE ELIGIBILITY OVERVIEW
-# =================================================
-
-st.subheader(
-    "Eligibility overview"
-)
-
-for result in eligibility_results:
-
-    scheme = result["scheme"]
-    evaluation = result["evaluation"]
-
-    status = evaluation["status"]
-
-    if status == "likely_eligible":
-
-        icon = "🟢"
-
-    elif status == "potentially_eligible":
-
-        icon = "🟡"
-
-    else:
-
-        icon = "🔴"
-
-    st.markdown(
-        f"### {icon} {scheme.get('name', 'Scheme')}"
-    )
-
-    st.write(
-        get_eligibility_summary(
-            evaluation
-        )
-    )
-
-    # ---------------------------------------------
-    # PASSED CONDITIONS
-    # ---------------------------------------------
-
-    if evaluation["passed"]:
-
-        with st.expander(
-            "Why this result?",
-            expanded=False
-        ):
-
-            st.markdown("**✓ Conditions satisfied**")
-
-            for condition in evaluation["passed"]:
-
-                st.write(
-                    f"✓ {condition}"
-                )
-
-            # -----------------------------------------
-            # FAILED CONDITIONS
-            # -----------------------------------------
-
-            if evaluation["failed"]:
-
-                st.markdown(
-                    "**✕ Conditions not satisfied**"
-                )
-
-                for condition in evaluation["failed"]:
-
-                    st.write(
-                        f"✕ {condition}"
+                    st.subheader(
+                        "Eligibility overview"
                     )
 
-            # -----------------------------------------
-            # UNKNOWN CONDITIONS
-            # -----------------------------------------
+                    for result in eligibility_results:
 
-            if evaluation["unknown"]:
+                        scheme = result["scheme"]
+                        evaluation = result["evaluation"]
 
-                st.markdown(
-                    "**? Information still needed**"
-                )
+                        status = evaluation["status"]
 
-                for condition in evaluation["unknown"]:
+                        if status == "likely_eligible":
 
-                    st.write(
-                        f"? {condition}"
-                    )
+                            icon = "🟢"
 
-    else:
+                        elif status == "potentially_eligible":
 
-        with st.expander(
-            "Why this result?",
-            expanded=True
-        ):
+                            icon = "🟡"
 
-            # -----------------------------------------
-            # FAILED CONDITIONS
-            # -----------------------------------------
+                        else:
 
-            if evaluation["failed"]:
+                            icon = "🔴"
 
-                st.markdown(
-                    "**✕ Conditions not satisfied**"
-                )
+                        st.markdown(
+                            f"### {icon} {scheme.get('name', 'Scheme')}"
+                        )
 
-                for condition in evaluation["failed"]:
+                        st.write(
+                            get_eligibility_summary(
+                                evaluation
+                            )
+                        )
 
-                    st.write(
-                        f"✕ {condition}"
-                    )
+                        with st.expander(
+                            "Why this result?",
+                            expanded=(
+                                status != "likely_eligible"
+                            )
+                        ):
 
-            # -----------------------------------------
-            # PASSED CONDITIONS
-            # -----------------------------------------
+                            # -----------------------------------------
+                            # PASSED CONDITIONS
+                            # -----------------------------------------
 
-            if evaluation["passed"]:
+                            if evaluation["passed"]:
 
-                st.markdown(
-                    "**✓ Conditions satisfied**"
-                )
+                                st.markdown(
+                                    "**✓ Conditions satisfied**"
+                                )
 
-                for condition in evaluation["passed"]:
+                                for condition in evaluation["passed"]:
 
-                    st.write(
-                        f"✓ {condition}"
-                    )
+                                    st.write(
+                                        f"✓ {condition}"
+                                    )
 
-            # -----------------------------------------
-            # UNKNOWN CONDITIONS
-            # -----------------------------------------
+                            # -----------------------------------------
+                            # FAILED CONDITIONS
+                            # -----------------------------------------
 
-            if evaluation["unknown"]:
+                            if evaluation["failed"]:
 
-                st.markdown(
-                    "**? Information still needed**"
-                )
+                                st.markdown(
+                                    "**✕ Conditions not satisfied**"
+                                )
 
-                for condition in evaluation["unknown"]:
+                                for condition in evaluation["failed"]:
 
-                    st.write(
-                        f"? {condition}"
-                    )
+                                    st.write(
+                                        f"✕ {condition}"
+                                    )
 
-    # ---------------------------------------------
-    # MISSING INFORMATION
-    # ---------------------------------------------
+                            # -----------------------------------------
+                            # UNKNOWN CONDITIONS
+                            # -----------------------------------------
 
-    if evaluation["missing_information"]:
+                            if evaluation["unknown"]:
 
-        st.caption(
-            "Information needed: "
-            + ", ".join(
-                evaluation["missing_information"]
-            )
-        )
+                                st.markdown(
+                                    "**? Information still needed**"
+                                )
+
+                                for condition in evaluation["unknown"]:
+
+                                    st.write(
+                                        f"? {condition}"
+                                    )
+
+                            # -----------------------------------------
+                            # NO CONDITIONS
+                            # -----------------------------------------
+
+                            if (
+                                not evaluation["passed"]
+                                and not evaluation["failed"]
+                                and not evaluation["unknown"]
+                            ):
+
+                                st.write(
+                                    "No structured eligibility conditions "
+                                    "are currently available for this scheme."
+                                )
+
+                        # ---------------------------------------------
+                        # MISSING INFORMATION
+                        # ---------------------------------------------
+
+                        if evaluation["missing_information"]:
+
+                            st.caption(
+                                "Information needed: "
+                                + ", ".join(
+                                    evaluation[
+                                        "missing_information"
+                                    ]
+                                )
+                            )
 
 
                     # =================================================
