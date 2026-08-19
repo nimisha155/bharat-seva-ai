@@ -667,10 +667,15 @@ if user_question:
                                 other_schemes.append(item)
 
                         if matching_scheme:
+                             # For a specific scheme question, show only
+                              # the explicitly requested scheme.
+                               retrieved_schemes = [  matching_scheme ]
+   
+      
+   
+   
 
-                            retrieved_schemes = [
-                                matching_scheme
-                            ] + other_schemes
+   
 
 
                 # =================================================
