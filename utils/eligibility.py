@@ -7,11 +7,9 @@ against a user's profile.
 It does NOT use Gemini or any LLM.
 It does NOT parse free-form eligibility text.
 
-Important:
-If a scheme has no structured eligibility rules, the engine does
-not claim that the user is eligible. It returns potentially_eligible
-because eligibility cannot be fully determined from the structured
-rules available to the application.
+If a scheme does not contain any actual structured eligibility
+conditions, the engine returns potentially_eligible instead of
+claiming that the user is eligible.
 """
 
 
@@ -32,6 +30,38 @@ def normalize_text(value):
         .replace("-", "_")
         .replace(" ", "_")
     )
+
+
+# =========================================================
+# CHECK WHETHER REAL RULES EXIST
+# =========================================================
+
+def has_actual_rules(rules):
+    """
+    Determine whether eligibility_rules contains at least
+    one meaningful structured condition.
+
+    Values such as None, empty strings, and empty lists
+    are treated as missing rules.
+    """
+
+    if not isinstance(rules, dict):
+        return False
+
+    for value in rules.values():
+
+        if value is None:
+            continue
+
+        if value == "":
+            continue
+
+        if value == []:
+            continue
+
+        return True
+
+    return False
 
 
 # =========================================================
@@ -63,7 +93,7 @@ def evaluate_eligibility(user_profile, scheme):
 
         potentially_eligible
             Some required information is missing OR the scheme
-            has no structured eligibility rules.
+            has no actual structured eligibility rules.
 
         not_eligible
             At least one known structured condition has failed.
@@ -72,10 +102,10 @@ def evaluate_eligibility(user_profile, scheme):
     rules = scheme.get("eligibility_rules")
 
     # ---------------------------------------------------------
-    # NO STRUCTURED RULES
+    # NO ACTUAL STRUCTURED RULES
     # ---------------------------------------------------------
 
-    if not rules:
+    if not has_actual_rules(rules):
 
         return {
             "status": "potentially_eligible",
