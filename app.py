@@ -65,7 +65,7 @@ SPECIFIC_SCHEME_KEYWORDS = {
 
 
 # =========================================================
-# DISCOVERY QUESTION DETECTION
+# DISCOVERY QUESTIONS
 # =========================================================
 
 DISCOVERY_KEYWORDS = [
@@ -89,14 +89,66 @@ DISCOVERY_KEYWORDS = [
 
 
 def is_discovery_question(question):
-    """
-    Detect whether the user is asking for general scheme discovery
-    rather than information about one specific scheme.
-    """
 
     question_lower = question.lower()
 
     for keyword in DISCOVERY_KEYWORDS:
+
+        if keyword in question_lower:
+            return True
+
+    return False
+
+
+# =========================================================
+# DOCUMENT / APPLICATION QUESTIONS
+# =========================================================
+
+DOCUMENT_KEYWORDS = [
+    "document",
+    "documents",
+    "required document",
+    "required documents",
+    "what do i need",
+    "what should i submit",
+    "what should i carry",
+    "papers needed",
+    "proof needed",
+    "proof required"
+]
+
+
+APPLICATION_KEYWORDS = [
+    "how to apply",
+    "how can i apply",
+    "where can i apply",
+    "application process",
+    "apply online",
+    "apply offline",
+    "how do i apply",
+    "where do i apply",
+    "registration process",
+    "how to register"
+]
+
+
+def is_document_question(question):
+
+    question_lower = question.lower()
+
+    for keyword in DOCUMENT_KEYWORDS:
+
+        if keyword in question_lower:
+            return True
+
+    return False
+
+
+def is_application_question(question):
+
+    question_lower = question.lower()
+
+    for keyword in APPLICATION_KEYWORDS:
 
         if keyword in question_lower:
             return True
@@ -123,6 +175,12 @@ SYSTEM_INSTRUCTION = (
     "information is required rather than claiming the user is eligible. "
     "If eligibility is marked not eligible, clearly explain the known failed "
     "condition without being unnecessarily discouraging. "
+    "When the user asks about documents, focus on the required documents "
+    "contained in the retrieved scheme context. "
+    "When the user asks how to apply, focus on the application process and "
+    "official URLs contained in the retrieved scheme context. "
+    "Do not add documents or application steps that are not present in the "
+    "retrieved scheme information. "
     "When multiple schemes are provided for a discovery question, prioritize "
     "schemes marked likely_eligible or potentially_eligible and explain why "
     "they may be relevant. "
@@ -676,6 +734,19 @@ if user_question:
                     user_question
                 )
 
+                document_question = is_document_question(
+                    user_question
+                )
+
+                application_question = is_application_question(
+                    user_question
+                )
+
+                focused_information_question = (
+                    document_question
+                    or application_question
+                )
+
 
                 # =================================================
                 # RETRIEVAL
@@ -719,7 +790,10 @@ if user_question:
                 # SPECIFIC SCHEME DETECTION
                 # =================================================
 
-                if retrieved_schemes and not discovery_question:
+                if (
+                    retrieved_schemes
+                    and not discovery_question
+                ):
 
                     question_lower = user_question.lower()
 
@@ -826,229 +900,393 @@ if user_question:
 
 
                     # =================================================
-                    # ELIGIBILITY OVERVIEW
+                    # DOCUMENT / APPLICATION QUESTIONS
                     # =================================================
 
-                    if discovery_question:
+                    if focused_information_question:
 
-                        st.subheader(
-                            "Schemes relevant to you"
-                        )
-
-                        st.caption(
-                            "Results are ranked using your profile, "
-                            "structured eligibility rules, and semantic relevance."
-                        )
-
-                    else:
-
-                        st.subheader(
-                            "Eligibility overview"
-                        )
-
-
-                    # =================================================
-                    # DISPLAY RESULTS
-                    # =================================================
-
-                    for result in eligibility_results:
-
-                        scheme = result["scheme"]
-                        evaluation = result["evaluation"]
-
-                        status = evaluation["status"]
-
-                        if status == "likely_eligible":
-
-                            icon = "🟢"
-
-                        elif status == "potentially_eligible":
-
-                            icon = "🟡"
-
-                        else:
-
-                            icon = "🔴"
-
-                        st.markdown(
-                            f"### {icon} {scheme.get('name', 'Scheme')}"
-                        )
-
-                        st.write(
-                            get_eligibility_summary(
-                                evaluation
-                            )
-                        )
-
-                        with st.expander(
-                            "Why this result?",
-                            expanded=(
-                                status != "likely_eligible"
-                            )
-                        ):
-
-                            # -----------------------------------------
-                            # PASSED CONDITIONS
-                            # -----------------------------------------
-
-                            if evaluation["passed"]:
-
-                                st.markdown(
-                                    "**✓ Conditions satisfied**"
-                                )
-
-                                for condition in evaluation["passed"]:
-
-                                    st.write(
-                                        f"✓ {condition}"
-                                    )
-
-                            # -----------------------------------------
-                            # FAILED CONDITIONS
-                            # -----------------------------------------
-
-                            if evaluation["failed"]:
-
-                                st.markdown(
-                                    "**✕ Conditions not satisfied**"
-                                )
-
-                                for condition in evaluation["failed"]:
-
-                                    st.write(
-                                        f"✕ {condition}"
-                                    )
-
-                            # -----------------------------------------
-                            # UNKNOWN CONDITIONS
-                            # -----------------------------------------
-
-                            if evaluation["unknown"]:
-
-                                st.markdown(
-                                    "**? Information still needed**"
-                                )
-
-                                for condition in evaluation["unknown"]:
-
-                                    st.write(
-                                        f"? {condition}"
-                                    )
-
-                            if (
-                                not evaluation["passed"]
-                                and not evaluation["failed"]
-                                and not evaluation["unknown"]
-                            ):
-
-                                st.write(
-                                    "No structured eligibility conditions "
-                                    "are currently available for this scheme."
-                                )
-
-                        if evaluation["missing_information"]:
-
-                            st.caption(
-                                "Information needed: "
-                                + ", ".join(
-                                    evaluation[
-                                        "missing_information"
-                                    ]
-                                )
-                            )
-
-
-                    # =================================================
-                    # GEMINI GENERATION
-                    # =================================================
-
-                    try:
-
-                        scheme_context = build_scheme_context(
-                            retrieved_schemes
-                        )
-
-                        eligibility_context = (
-                            build_eligibility_context(
-                                eligibility_results
-                            )
-                        )
-
-                        with st.spinner(
-                            "Preparing your personalized answer..."
-                        ):
-
-                            answer = get_gemini_response(
-                                client,
-                                user_question,
-                                scheme_context,
-                                eligibility_context
-                            )
-
-
-                        # =================================================
-                        # SOURCES
-                        # =================================================
-
-                        sources = []
+                        # -------------------------------------------------
+                        # Focused scheme information
+                        # -------------------------------------------------
 
                         for item in retrieved_schemes:
 
                             scheme = item["scheme"]
 
-                            sources.append(
-                                {
-                                    "name": scheme.get(
-                                        "name",
-                                        "Unknown scheme"
-                                    ),
-                                    "official_url": scheme.get(
-                                        "official_url",
-                                        "Not available"
-                                    ),
-                                    "source_url": scheme.get(
-                                        "source_url",
-                                        "Not available"
+                            if document_question:
+
+                                st.subheader(
+                                    f"📄 Documents required for "
+                                    f"{scheme.get('name', 'this scheme')}"
+                                )
+
+                                documents = scheme.get(
+                                    "required_documents"
+                                )
+
+                                if documents:
+
+                                    st.write(documents)
+
+                                else:
+
+                                    st.info(
+                                        "Required document information "
+                                        "is not available in the current "
+                                        "knowledge base."
                                     )
+
+                            if application_question:
+
+                                st.subheader(
+                                    f"📝 How to apply for "
+                                    f"{scheme.get('name', 'this scheme')}"
+                                )
+
+                                application_process = scheme.get(
+                                    "application_process"
+                                )
+
+                                if application_process:
+
+                                    st.write(
+                                        application_process
+                                    )
+
+                                else:
+
+                                    st.info(
+                                        "Application process information "
+                                        "is not available in the current "
+                                        "knowledge base."
+                                    )
+
+                            # ---------------------------------------------
+                            # OFFICIAL SOURCES
+                            # ---------------------------------------------
+
+                            official_url = scheme.get(
+                                "official_url"
+                            )
+
+                            source_url = scheme.get(
+                                "source_url"
+                            )
+
+                            if official_url:
+
+                                st.markdown(
+                                    f"🔗 **Official portal:** "
+                                    f"{official_url}"
+                                )
+
+                            if source_url:
+
+                                st.markdown(
+                                    f"📚 **Official source:** "
+                                    f"{source_url}"
+                                )
+
+                            st.caption(
+                                "Please verify the latest requirements "
+                                "on the official government portal because "
+                                "scheme rules can change."
+                            )
+
+
+                        # -------------------------------------------------
+                        # Gemini explanation
+                        # -------------------------------------------------
+
+                        try:
+
+                            scheme_context = build_scheme_context(
+                                retrieved_schemes
+                            )
+
+                            eligibility_context = (
+                                build_eligibility_context(
+                                    eligibility_results
+                                )
+                            )
+
+                            with st.spinner(
+                                "Preparing your answer..."
+                            ):
+
+                                answer = get_gemini_response(
+                                    client,
+                                    user_question,
+                                    scheme_context,
+                                    eligibility_context
+                                )
+
+                            st.write(answer)
+
+                            sources = []
+
+                            for item in retrieved_schemes:
+
+                                scheme = item["scheme"]
+
+                                sources.append(
+                                    {
+                                        "name": scheme.get(
+                                            "name",
+                                            "Unknown scheme"
+                                        ),
+                                        "official_url": scheme.get(
+                                            "official_url",
+                                            "Not available"
+                                        ),
+                                        "source_url": scheme.get(
+                                            "source_url",
+                                            "Not available"
+                                        )
+                                    }
+                                )
+
+                            st.session_state.messages.append(
+                                {
+                                    "role": "assistant",
+                                    "content": answer,
+                                    "sources": sources
+                                }
+                            )
+
+                        except Exception:
+
+                            error_text = (
+                                "The scheme information was retrieved, "
+                                "but the explanation could not be generated. "
+                                "Please use the displayed official source."
+                            )
+
+                            st.error(error_text)
+
+                            st.session_state.messages.append(
+                                {
+                                    "role": "assistant",
+                                    "content": error_text
                                 }
                             )
 
 
-                        st.write(answer)
+                    else:
 
+                        # =================================================
+                        # ELIGIBILITY OVERVIEW
+                        # =================================================
 
-                        for source in sources:
+                        if discovery_question:
 
-                            st.markdown(
-                                f"**{source['name']}**  \n"
-                                f"Official source: "
-                                f"{source['source_url']}  \n"
-                                f"Application / official portal: "
-                                f"{source['official_url']}"
+                            st.subheader(
+                                "Schemes relevant to you"
+                            )
+
+                            st.caption(
+                                "Results are ranked using your profile, "
+                                "structured eligibility rules, and semantic relevance."
+                            )
+
+                        else:
+
+                            st.subheader(
+                                "Eligibility overview"
                             )
 
 
-                        st.session_state.messages.append(
-                            {
-                                "role": "assistant",
-                                "content": answer,
-                                "sources": sources
-                            }
-                        )
+                        # =================================================
+                        # DISPLAY ELIGIBILITY RESULTS
+                        # =================================================
+
+                        for result in eligibility_results:
+
+                            scheme = result["scheme"]
+                            evaluation = result["evaluation"]
+
+                            status = evaluation["status"]
+
+                            if status == "likely_eligible":
+
+                                icon = "🟢"
+
+                            elif status == "potentially_eligible":
+
+                                icon = "🟡"
+
+                            else:
+
+                                icon = "🔴"
+
+                            st.markdown(
+                                f"### {icon} "
+                                f"{scheme.get('name', 'Scheme')}"
+                            )
+
+                            st.write(
+                                get_eligibility_summary(
+                                    evaluation
+                                )
+                            )
+
+                            with st.expander(
+                                "Why this result?",
+                                expanded=(
+                                    status != "likely_eligible"
+                                )
+                            ):
+
+                                if evaluation["passed"]:
+
+                                    st.markdown(
+                                        "**✓ Conditions satisfied**"
+                                    )
+
+                                    for condition in (
+                                        evaluation["passed"]
+                                    ):
+
+                                        st.write(
+                                            f"✓ {condition}"
+                                        )
+
+                                if evaluation["failed"]:
+
+                                    st.markdown(
+                                        "**✕ Conditions not satisfied**"
+                                    )
+
+                                    for condition in (
+                                        evaluation["failed"]
+                                    ):
+
+                                        st.write(
+                                            f"✕ {condition}"
+                                        )
+
+                                if evaluation["unknown"]:
+
+                                    st.markdown(
+                                        "**? Information still needed**"
+                                    )
+
+                                    for condition in (
+                                        evaluation["unknown"]
+                                    ):
+
+                                        st.write(
+                                            f"? {condition}"
+                                        )
+
+                                if (
+                                    not evaluation["passed"]
+                                    and not evaluation["failed"]
+                                    and not evaluation["unknown"]
+                                ):
+
+                                    st.write(
+                                        "No structured eligibility "
+                                        "conditions are currently "
+                                        "available for this scheme."
+                                    )
+
+                            if evaluation[
+                                "missing_information"
+                            ]:
+
+                                st.caption(
+                                    "Information needed: "
+                                    + ", ".join(
+                                        evaluation[
+                                            "missing_information"
+                                        ]
+                                    )
+                                )
 
 
-                    except Exception:
+                        # =================================================
+                        # GEMINI GENERATION
+                        # =================================================
 
-                        error_text = (
-                            "Sorry, something went wrong while "
-                            "generating the response. Please try again."
-                        )
+                        try:
 
-                        st.error(error_text)
+                            scheme_context = build_scheme_context(
+                                retrieved_schemes
+                            )
 
-                        st.session_state.messages.append(
-                            {
-                                "role": "assistant",
-                                "content": error_text
-                            }
-                        )
+                            eligibility_context = (
+                                build_eligibility_context(
+                                    eligibility_results
+                                )
+                            )
+
+                            with st.spinner(
+                                "Preparing your personalized answer..."
+                            ):
+
+                                answer = get_gemini_response(
+                                    client,
+                                    user_question,
+                                    scheme_context,
+                                    eligibility_context
+                                )
+
+                            sources = []
+
+                            for item in retrieved_schemes:
+
+                                scheme = item["scheme"]
+
+                                sources.append(
+                                    {
+                                        "name": scheme.get(
+                                            "name",
+                                            "Unknown scheme"
+                                        ),
+                                        "official_url": scheme.get(
+                                            "official_url",
+                                            "Not available"
+                                        ),
+                                        "source_url": scheme.get(
+                                            "source_url",
+                                            "Not available"
+                                        )
+                                    }
+                                )
+
+                            st.write(answer)
+
+                            for source in sources:
+
+                                st.markdown(
+                                    f"**{source['name']}**  \n"
+                                    f"Official source: "
+                                    f"{source['source_url']}  \n"
+                                    f"Application / official portal: "
+                                    f"{source['official_url']}"
+                                )
+
+                            st.session_state.messages.append(
+                                {
+                                    "role": "assistant",
+                                    "content": answer,
+                                    "sources": sources
+                                }
+                            )
+
+                        except Exception:
+
+                            error_text = (
+                                "Sorry, something went wrong while "
+                                "generating the response. Please try again."
+                            )
+
+                            st.error(error_text)
+
+                            st.session_state.messages.append(
+                                {
+                                    "role": "assistant",
+                                    "content": error_text
+                                }
+                            )
