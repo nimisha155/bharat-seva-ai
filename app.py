@@ -6,6 +6,10 @@ from utils.retriever import retrieve_schemes, RetrieverError
 from utils.eligibility import evaluate_eligibility, get_eligibility_summary
 
 
+# =========================================================
+# PAGE CONFIGURATION
+# =========================================================
+
 st.set_page_config(
     page_title="Bharat Seva AI",
     page_icon="🇮🇳",
@@ -17,6 +21,54 @@ MODEL_NAME = "gemini-2.5-flash"
 TOP_K_SCHEMES = 3
 
 
+# =========================================================
+# SPECIFIC SCHEME KEYWORDS
+# =========================================================
+
+SPECIFIC_SCHEME_KEYWORDS = {
+    "pm kisan": "pm-kisan",
+    "pm-kisan": "pm-kisan",
+    "kisan samman": "pm-kisan",
+
+    "pmay": "pmay",
+    "pmay urban": "pmay",
+
+    "ayushman bharat": "ab-pmjay",
+    "pm jay": "ab-pmjay",
+    "pmjay": "ab-pmjay",
+
+    "ujjwala": "pmuy",
+    "pmuy": "pmuy",
+
+    "jan dhan": "pmjdy",
+    "pmjdy": "pmjdy",
+
+    "mudra": "pmmy",
+    "pmmy": "pmmy",
+
+    "pmkvy": "pmkvy",
+    "kaushal vikas": "pmkvy",
+
+    "central sector scholarship": "csss",
+    "college scholarship": "csss",
+
+    "sukanya": "ssy",
+    "sukanya samriddhi": "ssy",
+
+    "svanidhi": "pm-svanidhi",
+    "street vendor": "pm-svanidhi",
+
+    "stand up india": "stand-up-india",
+    "stand-up india": "stand-up-india",
+
+    "adip": "adip"
+}
+
+
+# =========================================================
+# SYSTEM INSTRUCTION
+# =========================================================
+
 SYSTEM_INSTRUCTION = (
     "You are Bharat Seva AI, an assistant that helps people understand Indian "
     "government schemes and public services. "
@@ -26,7 +78,7 @@ SYSTEM_INSTRUCTION = (
     "scheme-specific factual claims. "
     "Do not invent or guess scheme names, eligibility criteria, benefits, "
     "required documents, deadlines, or application links. "
-    "Do not override the deterministic eligibility results provided by the "
+    "Do not override deterministic eligibility results provided by the "
     "eligibility engine. "
     "If eligibility is marked potentially eligible, explain that additional "
     "information is required rather than claiming the user is eligible. "
@@ -45,9 +97,9 @@ NO_CONTEXT_MESSAGE = (
 )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # GEMINI CLIENT
-# ---------------------------------------------------------
+# =========================================================
 
 def get_gemini_client():
 
@@ -59,9 +111,9 @@ def get_gemini_client():
     return genai.Client(api_key=api_key)
 
 
-# ---------------------------------------------------------
+# =========================================================
 # SIDEBAR - USER PROFILE
-# ---------------------------------------------------------
+# =========================================================
 
 with st.sidebar:
 
@@ -171,9 +223,9 @@ with st.sidebar:
     )
 
 
-# ---------------------------------------------------------
+# =========================================================
 # MAIN PAGE
-# ---------------------------------------------------------
+# =========================================================
 
 st.title("Bharat Seva AI 🇮🇳")
 
@@ -186,18 +238,18 @@ st.write(
 st.divider()
 
 
-# ---------------------------------------------------------
+# =========================================================
 # SESSION STATE
-# ---------------------------------------------------------
+# =========================================================
 
 if "messages" not in st.session_state:
 
     st.session_state.messages = []
 
 
-# ---------------------------------------------------------
+# =========================================================
 # DISPLAY PREVIOUS MESSAGES
-# ---------------------------------------------------------
+# =========================================================
 
 for message in st.session_state.messages:
 
@@ -214,9 +266,9 @@ for message in st.session_state.messages:
             )
 
 
-# ---------------------------------------------------------
-# PROFILE CONTEXT
-# ---------------------------------------------------------
+# =========================================================
+# PROFILE HELPERS
+# =========================================================
 
 def parse_income():
 
@@ -224,8 +276,12 @@ def parse_income():
         return None
 
     try:
+
         value = float(
-            income_text.replace(",", "").replace("₹", "").strip()
+            income_text
+            .replace(",", "")
+            .replace("₹", "")
+            .strip()
         )
 
         if value < 0:
@@ -234,6 +290,7 @@ def parse_income():
         return value
 
     except ValueError:
+
         return None
 
 
@@ -309,16 +366,19 @@ def build_retrieval_query(user_question):
     profile_bits = []
 
     if occupation:
+
         profile_bits.append(
             f"occupation: {occupation}"
         )
 
     if state and state != "Other":
+
         profile_bits.append(
             f"state: {state}"
         )
 
     if income_text:
+
         profile_bits.append(
             f"annual household income: {income_text}"
         )
@@ -328,6 +388,7 @@ def build_retrieval_query(user_question):
     )
 
     if gender != "Prefer not to say":
+
         profile_bits.append(
             f"gender: {gender}"
         )
@@ -342,9 +403,9 @@ def build_retrieval_query(user_question):
     return user_question
 
 
-# ---------------------------------------------------------
+# =========================================================
 # SCHEME CONTEXT
-# ---------------------------------------------------------
+# =========================================================
 
 def build_scheme_context(retrieved_schemes):
 
@@ -381,9 +442,9 @@ def build_scheme_context(retrieved_schemes):
     return "\n\n---\n\n".join(blocks)
 
 
-# ---------------------------------------------------------
+# =========================================================
 # ELIGIBILITY CONTEXT
-# ---------------------------------------------------------
+# =========================================================
 
 def build_eligibility_context(results):
 
@@ -413,9 +474,9 @@ def build_eligibility_context(results):
     return "\n\n---\n\n".join(blocks)
 
 
-# ---------------------------------------------------------
+# =========================================================
 # GEMINI RESPONSE
-# ---------------------------------------------------------
+# =========================================================
 
 def get_gemini_response(
     client,
@@ -428,7 +489,6 @@ def get_gemini_response(
 
     contents = []
 
-    # Exclude current user message.
     for msg in st.session_state.messages[:-1]:
 
         role = (
@@ -479,9 +539,9 @@ def get_gemini_response(
     return response.text
 
 
-# ---------------------------------------------------------
+# =========================================================
 # CHAT INPUT
-# ---------------------------------------------------------
+# =========================================================
 
 user_question = st.chat_input(
     "Ask about a government scheme..."
@@ -509,11 +569,9 @@ if user_question:
 
             st.write(user_question)
 
-
         with st.chat_message("assistant"):
 
             client = get_gemini_client()
-
 
             if client is None:
 
@@ -531,12 +589,11 @@ if user_question:
                     }
                 )
 
-
             else:
 
-                # -------------------------------------------------
+                # =================================================
                 # RETRIEVAL
-                # -------------------------------------------------
+                # =================================================
 
                 try:
 
@@ -544,10 +601,8 @@ if user_question:
                         "Searching the scheme knowledge base..."
                     ):
 
-                        retrieval_query = (
-                            build_retrieval_query(
-                                user_question
-                            )
+                        retrieval_query = build_retrieval_query(
+                            user_question
                         )
 
                         retrieved_schemes = retrieve_schemes(
@@ -574,9 +629,53 @@ if user_question:
                     )
 
 
-                # -------------------------------------------------
+                # =================================================
+                # SMART SPECIFIC-SCHEME PRIORITIZATION
+                # =================================================
+
+                if retrieved_schemes:
+
+                    question_lower = user_question.lower()
+
+                    specific_scheme_id = None
+
+                    for keyword, scheme_id in (
+                        SPECIFIC_SCHEME_KEYWORDS.items()
+                    ):
+
+                        if keyword in question_lower:
+
+                            specific_scheme_id = scheme_id
+                            break
+
+                    if specific_scheme_id:
+
+                        matching_scheme = None
+                        other_schemes = []
+
+                        for item in retrieved_schemes:
+
+                            if (
+                                item["scheme"].get("scheme_id")
+                                == specific_scheme_id
+                            ):
+
+                                matching_scheme = item
+
+                            else:
+
+                                other_schemes.append(item)
+
+                        if matching_scheme:
+
+                            retrieved_schemes = [
+                                matching_scheme
+                            ] + other_schemes
+
+
+                # =================================================
                 # NO RESULTS
-                # -------------------------------------------------
+                # =================================================
 
                 if retrieved_schemes is None:
 
@@ -592,7 +691,6 @@ if user_question:
                         }
                     )
 
-
                 elif not retrieved_schemes:
 
                     st.write(
@@ -606,12 +704,11 @@ if user_question:
                         }
                     )
 
-
                 else:
 
-                    # -------------------------------------------------
+                    # =================================================
                     # ELIGIBILITY EVALUATION
-                    # -------------------------------------------------
+                    # =================================================
 
                     user_profile = build_user_profile()
 
@@ -633,9 +730,9 @@ if user_question:
                         )
 
 
-                    # -------------------------------------------------
-                    # DISPLAY ELIGIBILITY CARDS
-                    # -------------------------------------------------
+                    # =================================================
+                    # ELIGIBILITY OVERVIEW
+                    # =================================================
 
                     st.subheader(
                         "Eligibility overview"
@@ -691,16 +788,14 @@ if user_question:
                             )
 
 
-                    # -------------------------------------------------
+                    # =================================================
                     # GEMINI GENERATION
-                    # -------------------------------------------------
+                    # =================================================
 
                     try:
 
-                        scheme_context = (
-                            build_scheme_context(
-                                retrieved_schemes
-                            )
+                        scheme_context = build_scheme_context(
+                            retrieved_schemes
                         )
 
                         eligibility_context = (
@@ -721,9 +816,9 @@ if user_question:
                             )
 
 
-                        # -------------------------------------------------
+                        # =================================================
                         # SOURCES
-                        # -------------------------------------------------
+                        # =================================================
 
                         sources = []
 
@@ -750,7 +845,6 @@ if user_question:
 
 
                         st.write(answer)
-
 
                         for source in sources:
 
