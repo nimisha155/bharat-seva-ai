@@ -84,7 +84,18 @@ DISCOVERY_KEYWORDS = [
     "recommendations",
     "schemes i can apply",
     "schemes i can get",
-    "help me find schemes"
+    "help me find schemes",
+
+    "kaun si yojana",
+    "kaunse scheme",
+    "kaunsi scheme",
+    "mere liye scheme",
+    "mere liye yojana",
+
+    "ఏ పథకాలు",
+    "ఏ ప్రభుత్వ పథకాలు",
+    "నాకు ఏ పథకాలు",
+    "నాకు ఉపయోగపడే పథకాలు"
 ]
 
 
@@ -101,7 +112,7 @@ def is_discovery_question(question):
 
 
 # =========================================================
-# DOCUMENT / APPLICATION QUESTIONS
+# DOCUMENT QUESTIONS
 # =========================================================
 
 DOCUMENT_KEYWORDS = [
@@ -114,21 +125,22 @@ DOCUMENT_KEYWORDS = [
     "what should i carry",
     "papers needed",
     "proof needed",
-    "proof required"
-]
+    "proof required",
 
+    "documents chahiye",
+    "document chahiye",
+    "kya documents",
+    "kaunse documents",
+    "kaun se documents",
+    "kya chahiye",
 
-APPLICATION_KEYWORDS = [
-    "how to apply",
-    "how can i apply",
-    "where can i apply",
-    "application process",
-    "apply online",
-    "apply offline",
-    "how do i apply",
-    "where do i apply",
-    "registration process",
-    "how to register"
+    "documents enti",
+    "document enti",
+    "ఏ పత్రాలు",
+    "ఏ డాక్యుమెంట్లు",
+    "ఏ పత్రాలు కావాలి",
+    "ఏ డాక్యుమెంట్లు కావాలి",
+    "ఏం కావాలి"
 ]
 
 
@@ -144,6 +156,35 @@ def is_document_question(question):
     return False
 
 
+# =========================================================
+# APPLICATION QUESTIONS
+# =========================================================
+
+APPLICATION_KEYWORDS = [
+    "how to apply",
+    "how can i apply",
+    "where can i apply",
+    "application process",
+    "apply online",
+    "apply offline",
+    "how do i apply",
+    "where do i apply",
+    "registration process",
+    "how to register",
+
+    "kaise apply",
+    "kahan apply",
+    "apply kaise",
+    "application kaise",
+
+    "ఎలా దరఖాస్తు",
+    "ఎలా అప్లై",
+    "ఎక్కడ అప్లై",
+    "దరఖాస్తు ఎలా",
+    "ఎలా నమోదు"
+]
+
+
 def is_application_question(question):
 
     question_lower = question.lower()
@@ -154,6 +195,45 @@ def is_application_question(question):
             return True
 
     return False
+
+
+# =========================================================
+# LANGUAGE DETECTION
+# =========================================================
+
+def detect_language(text):
+    """
+    Detect the user's response language from the script used.
+
+    Telugu Unicode range:
+        \u0C00-\u0C7F
+
+    Hindi / Devanagari Unicode range:
+        \u0900-\u097F
+
+    Defaults to English.
+    """
+
+    telugu_count = 0
+    hindi_count = 0
+
+    for char in text:
+
+        if "\u0C00" <= char <= "\u0C7F":
+            telugu_count += 1
+
+        elif "\u0900" <= char <= "\u097F":
+            hindi_count += 1
+
+    if telugu_count > hindi_count and telugu_count > 0:
+
+        return "Telugu"
+
+    if hindi_count > telugu_count and hindi_count > 0:
+
+        return "Hindi"
+
+    return "English"
 
 
 # =========================================================
@@ -184,7 +264,15 @@ SYSTEM_INSTRUCTION = (
     "When multiple schemes are provided for a discovery question, prioritize "
     "schemes marked likely_eligible or potentially_eligible and explain why "
     "they may be relevant. "
-    "Use the user's profile to personalize the explanation when relevant. "
+    "Use the user's profile to personalize the response when relevant. "
+    "Most importantly, respond ONLY in the requested response language. "
+    "Never provide the same answer again in another language unless the "
+    "user explicitly asks for a translation. "
+    "Do not produce an English version followed by a Hindi or Telugu version. "
+    "If the requested language is Hindi, write only Hindi. "
+    "If the requested language is Telugu, write only Telugu. "
+    "If the requested language is English, write only English. "
+    "Keep official URLs unchanged. "
     "Encourage users to verify important details on the official government "
     "source because scheme rules can change."
 )
@@ -617,7 +705,10 @@ def get_gemini_response(
     client,
     user_question,
     scheme_context,
-    eligibility_context
+    eligibility_context,
+    response_language,
+    document_question=False,
+    application_question=False
 ):
 
     profile_context = build_profile_context()
@@ -643,12 +734,43 @@ def get_gemini_response(
             )
         )
 
+    special_instruction = ""
+
+    if document_question:
+
+        special_instruction = (
+            "This is a DOCUMENT question. "
+            "Answer only about the documents contained in the retrieved "
+            "scheme context. Do not discuss the user's eligibility unless "
+            "the user explicitly asks about eligibility. "
+        )
+
+    elif application_question:
+
+        special_instruction = (
+            "This is an APPLICATION question. "
+            "Answer only about the application process and official portal "
+            "contained in the retrieved scheme context. Do not discuss "
+            "the user's eligibility unless the user explicitly asks about it. "
+        )
+
+    language_instruction = (
+        f"The required response language is {response_language}. "
+        f"Write the response ONLY in {response_language}. "
+        f"Do not provide a translation in English, Hindi, Telugu, or any "
+        f"other language. "
+        f"Do not repeat the answer in another language. "
+        f"Official URLs must remain unchanged."
+    )
+
     turn_text = (
         f"{profile_context}\n\n"
         f"Retrieved scheme context:\n"
         f"{scheme_context}\n\n"
         f"Deterministic eligibility evaluation:\n"
         f"{eligibility_context}\n\n"
+        f"{special_instruction}"
+        f"{language_instruction}\n\n"
         f"Question: {user_question}"
     )
 
@@ -727,7 +849,7 @@ if user_question:
             else:
 
                 # =================================================
-                # DETECT QUESTION TYPE
+                # DETECT QUESTION TYPE + LANGUAGE
                 # =================================================
 
                 discovery_question = is_discovery_question(
@@ -745,6 +867,10 @@ if user_question:
                 focused_information_question = (
                     document_question
                     or application_question
+                )
+
+                response_language = detect_language(
+                    user_question
                 )
 
 
@@ -905,10 +1031,6 @@ if user_question:
 
                     if focused_information_question:
 
-                        # -------------------------------------------------
-                        # Focused scheme information
-                        # -------------------------------------------------
-
                         for item in retrieved_schemes:
 
                             scheme = item["scheme"]
@@ -961,10 +1083,6 @@ if user_question:
                                         "knowledge base."
                                     )
 
-                            # ---------------------------------------------
-                            # OFFICIAL SOURCES
-                            # ---------------------------------------------
-
                             official_url = scheme.get(
                                 "official_url"
                             )
@@ -995,7 +1113,7 @@ if user_question:
 
 
                         # -------------------------------------------------
-                        # Gemini explanation
+                        # GEMINI EXPLANATION
                         # -------------------------------------------------
 
                         try:
@@ -1018,7 +1136,10 @@ if user_question:
                                     client,
                                     user_question,
                                     scheme_context,
-                                    eligibility_context
+                                    eligibility_context,
+                                    response_language,
+                                    document_question,
+                                    application_question
                                 )
 
                             st.write(answer)
@@ -1229,7 +1350,8 @@ if user_question:
                                     client,
                                     user_question,
                                     scheme_context,
-                                    eligibility_context
+                                    eligibility_context,
+                                    response_language
                                 )
 
                             sources = []
