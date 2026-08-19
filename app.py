@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 MODEL_NAME = "gemini-2.5-flash"
-TOP_K_SCHEMES = 3
+TOP_K_SCHEMES = 5
 
 
 # =========================================================
@@ -65,6 +65,46 @@ SPECIFIC_SCHEME_KEYWORDS = {
 
 
 # =========================================================
+# DISCOVERY QUESTION DETECTION
+# =========================================================
+
+DISCOVERY_KEYWORDS = [
+    "what schemes",
+    "which schemes",
+    "schemes for me",
+    "schemes can i",
+    "government schemes",
+    "eligible schemes",
+    "benefits available",
+    "what can i get",
+    "what am i eligible for",
+    "find schemes",
+    "recommend schemes",
+    "recommendation",
+    "recommendations",
+    "schemes i can apply",
+    "schemes i can get",
+    "help me find schemes"
+]
+
+
+def is_discovery_question(question):
+    """
+    Detect whether the user is asking for general scheme discovery
+    rather than information about one specific scheme.
+    """
+
+    question_lower = question.lower()
+
+    for keyword in DISCOVERY_KEYWORDS:
+
+        if keyword in question_lower:
+            return True
+
+    return False
+
+
+# =========================================================
 # SYSTEM INSTRUCTION
 # =========================================================
 
@@ -83,6 +123,9 @@ SYSTEM_INSTRUCTION = (
     "information is required rather than claiming the user is eligible. "
     "If eligibility is marked not eligible, clearly explain the known failed "
     "condition without being unnecessarily discouraging. "
+    "When multiple schemes are provided for a discovery question, prioritize "
+    "schemes marked likely_eligible or potentially_eligible and explain why "
+    "they may be relevant. "
     "Use the user's profile to personalize the explanation when relevant. "
     "Encourage users to verify important details on the official government "
     "source because scheme rules can change."
@@ -101,6 +144,7 @@ NO_CONTEXT_MESSAGE = (
 # =========================================================
 
 def get_gemini_client():
+
     api_key = st.secrets.get("GEMINI_API_KEY")
 
     if not api_key:
@@ -241,6 +285,7 @@ st.divider()
 # =========================================================
 
 if "messages" not in st.session_state:
+
     st.session_state.messages = []
 
 
@@ -270,6 +315,7 @@ for message in st.session_state.messages:
 def parse_income():
 
     if not income_text.strip():
+
         return None
 
     try:
@@ -282,6 +328,7 @@ def parse_income():
         )
 
         if value < 0:
+
             return None
 
         return value
@@ -472,6 +519,39 @@ def build_eligibility_context(results):
 
 
 # =========================================================
+# RANK DISCOVERY RESULTS
+# =========================================================
+
+def rank_discovery_results(results):
+
+    status_priority = {
+        "likely_eligible": 3,
+        "potentially_eligible": 2,
+        "not_eligible": 1
+    }
+
+    def ranking_key(result):
+
+        status = result["evaluation"]["status"]
+
+        similarity = result.get(
+            "similarity",
+            0
+        )
+
+        return (
+            status_priority.get(status, 0),
+            similarity
+        )
+
+    return sorted(
+        results,
+        key=ranking_key,
+        reverse=True
+    )
+
+
+# =========================================================
 # GEMINI RESPONSE
 # =========================================================
 
@@ -589,6 +669,15 @@ if user_question:
             else:
 
                 # =================================================
+                # DETECT QUESTION TYPE
+                # =================================================
+
+                discovery_question = is_discovery_question(
+                    user_question
+                )
+
+
+                # =================================================
                 # RETRIEVAL
                 # =================================================
 
@@ -627,10 +716,10 @@ if user_question:
 
 
                 # =================================================
-                # SMART SPECIFIC-SCHEME PRIORITIZATION
+                # SPECIFIC SCHEME DETECTION
                 # =================================================
 
-                if retrieved_schemes:
+                if retrieved_schemes and not discovery_question:
 
                     question_lower = user_question.lower()
 
@@ -661,8 +750,6 @@ if user_question:
 
                         if matching_scheme:
 
-                            # For a specific scheme question,
-                            # show only the explicitly requested scheme.
                             retrieved_schemes = [
                                 matching_scheme
                             ]
@@ -726,12 +813,43 @@ if user_question:
 
 
                     # =================================================
-                    # EXPLAINABLE ELIGIBILITY OVERVIEW
+                    # RANK DISCOVERY RESULTS
                     # =================================================
 
-                    st.subheader(
-                        "Eligibility overview"
-                    )
+                    if discovery_question:
+
+                        eligibility_results = (
+                            rank_discovery_results(
+                                eligibility_results
+                            )
+                        )
+
+
+                    # =================================================
+                    # ELIGIBILITY OVERVIEW
+                    # =================================================
+
+                    if discovery_question:
+
+                        st.subheader(
+                            "Schemes relevant to you"
+                        )
+
+                        st.caption(
+                            "Results are ranked using your profile, "
+                            "structured eligibility rules, and semantic relevance."
+                        )
+
+                    else:
+
+                        st.subheader(
+                            "Eligibility overview"
+                        )
+
+
+                    # =================================================
+                    # DISPLAY RESULTS
+                    # =================================================
 
                     for result in eligibility_results:
 
@@ -817,10 +935,6 @@ if user_question:
                                         f"? {condition}"
                                     )
 
-                            # -----------------------------------------
-                            # NO CONDITIONS
-                            # -----------------------------------------
-
                             if (
                                 not evaluation["passed"]
                                 and not evaluation["failed"]
@@ -831,10 +945,6 @@ if user_question:
                                     "No structured eligibility conditions "
                                     "are currently available for this scheme."
                                 )
-
-                        # ---------------------------------------------
-                        # MISSING INFORMATION
-                        # ---------------------------------------------
 
                         if evaluation["missing_information"]:
 
@@ -905,6 +1015,7 @@ if user_question:
 
 
                         st.write(answer)
+
 
                         for source in sources:
 
