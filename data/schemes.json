@@ -14,7 +14,19 @@
       "states": "All India",
       "official_url": "https://pmkisan.gov.in",
       "source_url": "https://www.pib.gov.in/PressReleasePage.aspx?PRID=2146932&reg=48&lang=2",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": null,
+        "max_age": null,
+        "max_annual_income": null,
+        "occupation": ["farmer"],
+        "gender": null,
+        "requires_landholding": true,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": null,
+        "requires_no_existing_house": null
+      }
     },
     {
       "scheme_id": "pmay",
@@ -30,7 +42,19 @@
       "states": "All India",
       "official_url": "https://pmaymis.gov.in",
       "source_url": "https://pmaymis.gov.in/pmaymis2_2024/PMAY_SURVEY/EligiblityCheck.aspx",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": null,
+        "max_age": null,
+        "max_annual_income": null,
+        "occupation": [],
+        "gender": null,
+        "requires_landholding": null,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": null,
+        "requires_no_existing_house": true
+      }
     },
     {
       "scheme_id": "ab-pmjay",
@@ -46,7 +70,19 @@
       "states": "All India",
       "official_url": "https://pmjay.gov.in",
       "source_url": "https://nha.gov.in/PM-JAY",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": null,
+        "max_age": null,
+        "max_annual_income": null,
+        "occupation": [],
+        "gender": null,
+        "requires_landholding": null,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": null,
+        "requires_no_existing_house": null
+      }
     },
     {
       "scheme_id": "pmuy",
@@ -62,7 +98,19 @@
       "states": "All India",
       "official_url": "https://www.pmuy.gov.in",
       "source_url": "https://www.pmuy.gov.in/",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": 18,
+        "max_age": null,
+        "max_annual_income": null,
+        "occupation": [],
+        "gender": "female",
+        "requires_landholding": null,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": null,
+        "requires_no_existing_house": null
+      }
     },
     {
       "scheme_id": "pmjdy",
@@ -78,7 +126,19 @@
       "states": "All India",
       "official_url": "https://pmjdy.gov.in",
       "source_url": "https://pmjdy.gov.in/scheme",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": null,
+        "max_age": null,
+        "max_annual_income": null,
+        "occupation": [],
+        "gender": null,
+        "requires_landholding": null,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": null,
+        "requires_no_existing_house": null
+      }
     },
     {
       "scheme_id": "pmmy",
@@ -94,7 +154,19 @@
       "states": "All India",
       "official_url": "https://www.mudra.org.in",
       "source_url": "https://static.pib.gov.in/WriteReadData/specificdocs/documents/2024/oct/doc20241029426401.pdf",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": null,
+        "max_age": null,
+        "max_annual_income": null,
+        "occupation": [],
+        "gender": null,
+        "requires_landholding": null,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": null,
+        "requires_no_existing_house": null
+      }
     },
     {
       "scheme_id": "pmkvy",
@@ -110,7 +182,19 @@
       "states": "All India",
       "official_url": "https://www.pmkvyofficial.org",
       "source_url": "https://dsde.goa.gov.in/pmkvy-3-0/",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": 15,
+        "max_age": 45,
+        "max_annual_income": null,
+        "occupation": [],
+        "gender": null,
+        "requires_landholding": null,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": null,
+        "requires_no_existing_house": null
+      }
     },
     {
       "scheme_id": "csss",
@@ -126,7 +210,19 @@
       "states": "All India",
       "official_url": "https://scholarships.gov.in",
       "source_url": "https://scholarships.gov.in/public/schemeGuidelines/Guidelines_DOHE_CSSS.pdf",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": null,
+        "max_age": null,
+        "max_annual_income": null,
+        "occupation": [],
+        "gender": null,
+        "requires_landholding": null,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": null,
+        "requires_no_existing_house": null
+      }
     },
     {
       "scheme_id": "ssy",
@@ -142,7 +238,19 @@
       "states": "All India",
       "official_url": "https://www.indiapost.gov.in",
       "source_url": "https://www.indiapost.gov.in/documents/offerings/schemesandservices/posb/SukanyaSamriddhiAccountScheme2019English.pdf",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": null,
+        "max_age": 10,
+        "max_annual_income": null,
+        "occupation": [],
+        "gender": "female",
+        "requires_landholding": null,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": null,
+        "requires_no_existing_house": null
+      }
     },
     {
       "scheme_id": "pm-svanidhi",
@@ -158,7 +266,19 @@
       "states": "All India",
       "official_url": "https://pmsvanidhi.mohua.gov.in",
       "source_url": "https://pmsvanidhi.mohua.gov.in/",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": null,
+        "max_age": null,
+        "max_annual_income": null,
+        "occupation": ["street_vendor"],
+        "gender": null,
+        "requires_landholding": null,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": null,
+        "requires_no_existing_house": null
+      }
     },
     {
       "scheme_id": "stand-up-india",
@@ -174,7 +294,19 @@
       "states": "All India",
       "official_url": "https://www.standupmitra.in",
       "source_url": "https://www.standupmitra.in/Home/SUISchemes",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": 18,
+        "max_age": null,
+        "max_annual_income": null,
+        "occupation": [],
+        "gender": null,
+        "requires_landholding": null,
+        "requires_disability": null,
+        "min_disability_percentage": null,
+        "requires_existing_business": false,
+        "requires_no_existing_house": null
+      }
     },
     {
       "scheme_id": "adip",
@@ -190,7 +322,19 @@
       "states": "All India",
       "official_url": "https://adip.depwd.gov.in",
       "source_url": "https://depwd.gov.in/en/adip/",
-      "last_verified": "2026-08-19"
+      "last_verified": "2026-08-19",
+      "eligibility_rules": {
+        "min_age": null,
+        "max_age": null,
+        "max_annual_income": 360000,
+        "occupation": [],
+        "gender": null,
+        "requires_landholding": null,
+        "requires_disability": true,
+        "min_disability_percentage": 40,
+        "requires_existing_business": null,
+        "requires_no_existing_house": null
+      }
     }
   ]
 }
