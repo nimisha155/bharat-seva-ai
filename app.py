@@ -3,6 +3,8 @@ from google import genai
 from google.genai import types
 
 from utils.retriever import retrieve_schemes, RetrieverError
+from utils.eligibility import evaluate_eligibility, get_eligibility_summary
+
 
 st.set_page_config(
     page_title="Bharat Seva AI",
@@ -10,38 +12,45 @@ st.set_page_config(
     layout="centered"
 )
 
+
 MODEL_NAME = "gemini-2.5-flash"
 TOP_K_SCHEMES = 3
+
 
 SYSTEM_INSTRUCTION = (
     "You are Bharat Seva AI, an assistant that helps people understand Indian "
     "government schemes and public services. "
-    "You will be given a 'Retrieved scheme context' section for each question. "
-    "This retrieved context is the primary source of truth for any scheme-specific "
-    "factual claims you make, such as scheme names, eligibility criteria, benefits, "
+    "You will be given retrieved scheme information and, when relevant, "
+    "eligibility evaluation results. "
+    "The retrieved scheme context is the primary source of truth for "
+    "scheme-specific factual claims. "
+    "Do not invent or guess scheme names, eligibility criteria, benefits, "
     "required documents, deadlines, or application links. "
-    "Do NOT invent or guess scheme-specific details. Do not rely on your general "
-    "training knowledge to fill in facts that are missing from the retrieved context. "
-    "If the retrieved context does not contain enough information to answer the "
-    "question, clearly say that this could not be verified from the current "
-    "knowledge base, rather than guessing. "
-    "Clearly distinguish between verified information from the retrieved knowledge "
-    "base and general guidance or explanation you are adding. "
-    "Use the user's profile only to personalize the explanation when relevant. "
-    "Always encourage the user to verify important details on the official "
-    "government source, since scheme rules can change over time."
+    "Do not override the deterministic eligibility results provided by the "
+    "eligibility engine. "
+    "If eligibility is marked potentially eligible, explain that additional "
+    "information is required rather than claiming the user is eligible. "
+    "If eligibility is marked not eligible, clearly explain the known failed "
+    "condition without being unnecessarily discouraging. "
+    "Use the user's profile to personalize the explanation when relevant. "
+    "Encourage users to verify important details on the official government "
+    "source because scheme rules can change."
 )
+
 
 NO_CONTEXT_MESSAGE = (
-    "I couldn't find a scheme in Bharat Seva AI's current knowledge base that is "
-    "clearly relevant to your question. To help you better, please try asking a "
-    "more specific question — for example, naming the type of support you're "
-    "looking for (such as housing, healthcare, education, or a business loan) or "
-    "the scheme name if you know it."
+    "I couldn't find a sufficiently relevant scheme in Bharat Seva AI's "
+    "current knowledge base. Try asking about a specific area such as "
+    "education, healthcare, housing, farming, employment, or business."
 )
 
 
+# ---------------------------------------------------------
+# GEMINI CLIENT
+# ---------------------------------------------------------
+
 def get_gemini_client():
+
     api_key = st.secrets.get("GEMINI_API_KEY")
 
     if not api_key:
@@ -50,9 +59,18 @@ def get_gemini_client():
     return genai.Client(api_key=api_key)
 
 
+# ---------------------------------------------------------
+# SIDEBAR - USER PROFILE
+# ---------------------------------------------------------
+
 with st.sidebar:
+
     st.header("Your Profile")
-    st.caption("This information helps personalize scheme recommendations.")
+
+    st.caption(
+        "These details help Bharat Seva AI personalize "
+        "scheme recommendations and eligibility checks."
+    )
 
     age = st.number_input(
         "Age",
@@ -88,38 +106,107 @@ with st.sidebar:
         placeholder="e.g. Student, Farmer, Business Owner"
     )
 
-    income = st.text_input(
+    income_text = st.text_input(
         "Annual Household Income (₹)",
         placeholder="e.g. 250000"
     )
 
+    st.divider()
+
+    st.subheader("Eligibility Details")
+
+    gender = st.selectbox(
+        "Gender",
+        [
+            "Prefer not to say",
+            "Female",
+            "Male",
+            "Other"
+        ]
+    )
+
+    has_landholding = st.selectbox(
+        "Do you have agricultural land?",
+        [
+            "Not provided",
+            "Yes",
+            "No"
+        ]
+    )
+
+    has_disability = st.selectbox(
+        "Do you have a disability?",
+        [
+            "Not provided",
+            "Yes",
+            "No"
+        ]
+    )
+
+    disability_percentage = st.number_input(
+        "Disability percentage",
+        min_value=0,
+        max_value=100,
+        value=0,
+        step=1,
+        help="Enter 0 if disability information is not applicable."
+    )
+
+    has_existing_business = st.selectbox(
+        "Do you have an existing business?",
+        [
+            "Not provided",
+            "Yes",
+            "No"
+        ]
+    )
+
+    owns_house = st.selectbox(
+        "Do you currently own a house?",
+        [
+            "Not provided",
+            "Yes",
+            "No"
+        ]
+    )
+
+
+# ---------------------------------------------------------
+# MAIN PAGE
+# ---------------------------------------------------------
 
 st.title("Bharat Seva AI 🇮🇳")
 
 st.write(
-    "Bharat Seva AI helps citizens of India discover and understand "
-    "government schemes relevant to them — including benefits, eligibility "
-    "criteria, required documents, and how to apply."
+    "Discover Indian government schemes relevant to you, "
+    "understand their benefits and eligibility, and find official "
+    "application sources."
 )
 
 st.divider()
 
+
+# ---------------------------------------------------------
+# SESSION STATE
+# ---------------------------------------------------------
+
 if "messages" not in st.session_state:
+
     st.session_state.messages = []
 
 
-st.subheader("Ask Bharat Seva AI")
-
-st.write(
-    "Type a question below about government schemes you're interested in."
-)
-
+# ---------------------------------------------------------
+# DISPLAY PREVIOUS MESSAGES
+# ---------------------------------------------------------
 
 for message in st.session_state.messages:
+
     with st.chat_message(message["role"]):
+
         st.write(message["content"])
 
         for source in message.get("sources", []):
+
             st.markdown(
                 f"**{source['name']}**  \n"
                 f"Official source: {source['source_url']}  \n"
@@ -127,32 +214,126 @@ for message in st.session_state.messages:
             )
 
 
+# ---------------------------------------------------------
+# PROFILE CONTEXT
+# ---------------------------------------------------------
+
+def parse_income():
+
+    if not income_text.strip():
+        return None
+
+    try:
+        value = float(
+            income_text.replace(",", "").replace("₹", "").strip()
+        )
+
+        if value < 0:
+            return None
+
+        return value
+
+    except ValueError:
+        return None
+
+
 def build_profile_context():
+
     return (
         f"User profile:\n"
         f"- Age: {age}\n"
         f"- State: {state}\n"
-        f"- Occupation: {occupation if occupation else 'Not provided'}\n"
+        f"- Occupation: "
+        f"{occupation if occupation else 'Not provided'}\n"
         f"- Annual household income: "
-        f"{income if income else 'Not provided'}\n"
+        f"{income_text if income_text else 'Not provided'}\n"
+        f"- Gender: "
+        f"{gender if gender != 'Prefer not to say' else 'Not provided'}\n"
     )
 
 
+def build_user_profile():
+
+    income = parse_income()
+
+    profile = {
+        "age": age,
+        "state": state,
+        "occupation": occupation if occupation else None,
+        "annual_income": income,
+        "gender": (
+            gender.lower()
+            if gender != "Prefer not to say"
+            else None
+        ),
+        "has_landholding": (
+            True
+            if has_landholding == "Yes"
+            else False
+            if has_landholding == "No"
+            else None
+        ),
+        "has_disability": (
+            True
+            if has_disability == "Yes"
+            else False
+            if has_disability == "No"
+            else None
+        ),
+        "disability_percentage": (
+            disability_percentage
+            if has_disability == "Yes"
+            else None
+        ),
+        "has_existing_business": (
+            True
+            if has_existing_business == "Yes"
+            else False
+            if has_existing_business == "No"
+            else None
+        ),
+        "owns_house": (
+            True
+            if owns_house == "Yes"
+            else False
+            if owns_house == "No"
+            else None
+        )
+    }
+
+    return profile
+
+
 def build_retrieval_query(user_question):
+
     profile_bits = []
 
     if occupation:
-        profile_bits.append(f"occupation: {occupation}")
+        profile_bits.append(
+            f"occupation: {occupation}"
+        )
 
     if state and state != "Other":
-        profile_bits.append(f"state: {state}")
+        profile_bits.append(
+            f"state: {state}"
+        )
 
-    if income:
-        profile_bits.append(f"annual household income: {income}")
+    if income_text:
+        profile_bits.append(
+            f"annual household income: {income_text}"
+        )
 
-    profile_bits.append(f"age: {age}")
+    profile_bits.append(
+        f"age: {age}"
+    )
+
+    if gender != "Prefer not to say":
+        profile_bits.append(
+            f"gender: {gender}"
+        )
 
     if profile_bits:
+
         return (
             f"{user_question} "
             f"(User details — {', '.join(profile_bits)})"
@@ -161,10 +342,16 @@ def build_retrieval_query(user_question):
     return user_question
 
 
+# ---------------------------------------------------------
+# SCHEME CONTEXT
+# ---------------------------------------------------------
+
 def build_scheme_context(retrieved_schemes):
+
     blocks = []
 
     for item in retrieved_schemes:
+
         scheme = item["scheme"]
 
         block = (
@@ -194,33 +381,90 @@ def build_scheme_context(retrieved_schemes):
     return "\n\n---\n\n".join(blocks)
 
 
-def get_gemini_response(client, user_question, scheme_context):
+# ---------------------------------------------------------
+# ELIGIBILITY CONTEXT
+# ---------------------------------------------------------
+
+def build_eligibility_context(results):
+
+    blocks = []
+
+    for result in results:
+
+        scheme = result["scheme"]
+        evaluation = result["evaluation"]
+
+        block = (
+            f"Scheme: {scheme.get('name', 'Unknown')}\n"
+            f"Eligibility status: {evaluation['status']}\n"
+            f"Summary: {get_eligibility_summary(evaluation)}\n"
+            f"Passed conditions: "
+            f"{'; '.join(evaluation['passed']) if evaluation['passed'] else 'None'}\n"
+            f"Failed conditions: "
+            f"{'; '.join(evaluation['failed']) if evaluation['failed'] else 'None'}\n"
+            f"Unknown conditions: "
+            f"{'; '.join(evaluation['unknown']) if evaluation['unknown'] else 'None'}\n"
+            f"Missing information: "
+            f"{', '.join(evaluation['missing_information']) if evaluation['missing_information'] else 'None'}"
+        )
+
+        blocks.append(block)
+
+    return "\n\n---\n\n".join(blocks)
+
+
+# ---------------------------------------------------------
+# GEMINI RESPONSE
+# ---------------------------------------------------------
+
+def get_gemini_response(
+    client,
+    user_question,
+    scheme_context,
+    eligibility_context
+):
+
     profile_context = build_profile_context()
 
     contents = []
 
-    # Exclude the current user message because it is added separately below.
+    # Exclude current user message.
     for msg in st.session_state.messages[:-1]:
-        role = "user" if msg["role"] == "user" else "model"
+
+        role = (
+            "user"
+            if msg["role"] == "user"
+            else "model"
+        )
 
         contents.append(
             types.Content(
                 role=role,
-                parts=[types.Part(text=msg["content"])]
+                parts=[
+                    types.Part(
+                        text=msg["content"]
+                    )
+                ]
             )
         )
 
     turn_text = (
-        f"{profile_context}\n"
-        f"Retrieved scheme context (source of truth for this answer):\n"
+        f"{profile_context}\n\n"
+        f"Retrieved scheme context:\n"
         f"{scheme_context}\n\n"
+        f"Deterministic eligibility evaluation:\n"
+        f"{eligibility_context}\n\n"
         f"Question: {user_question}"
     )
 
     contents.append(
         types.Content(
             role="user",
-            parts=[types.Part(text=turn_text)]
+            parts=[
+                types.Part(
+                    text=turn_text
+                )
+            ]
         )
     )
 
@@ -235,14 +479,22 @@ def get_gemini_response(client, user_question, scheme_context):
     return response.text
 
 
+# ---------------------------------------------------------
+# CHAT INPUT
+# ---------------------------------------------------------
+
 user_question = st.chat_input(
     "Ask about a government scheme..."
 )
 
+
 if user_question:
 
     if not user_question.strip():
-        st.warning("Please enter a question.")
+
+        st.warning(
+            "Please enter a question."
+        )
 
     else:
 
@@ -254,18 +506,20 @@ if user_question:
         )
 
         with st.chat_message("user"):
+
             st.write(user_question)
+
 
         with st.chat_message("assistant"):
 
             client = get_gemini_client()
 
+
             if client is None:
 
                 error_text = (
                     "Bharat Seva AI is not fully configured yet. "
-                    "The Gemini API key is missing. Please contact "
-                    "the app administrator."
+                    "The Gemini API key is missing."
                 )
 
                 st.error(error_text)
@@ -277,10 +531,12 @@ if user_question:
                     }
                 )
 
+
             else:
 
-                retrieved_schemes = None
-                retrieval_failed = False
+                # -------------------------------------------------
+                # RETRIEVAL
+                # -------------------------------------------------
 
                 try:
 
@@ -288,8 +544,10 @@ if user_question:
                         "Searching the scheme knowledge base..."
                     ):
 
-                        retrieval_query = build_retrieval_query(
-                            user_question
+                        retrieval_query = (
+                            build_retrieval_query(
+                                user_question
+                            )
                         )
 
                         retrieved_schemes = retrieve_schemes(
@@ -299,23 +557,33 @@ if user_question:
 
                 except RetrieverError:
 
-                    retrieval_failed = True
+                    retrieved_schemes = None
+
+                    st.error(
+                        "I couldn't search the scheme knowledge "
+                        "base right now. Please try again."
+                    )
 
                 except Exception:
 
-                    retrieval_failed = True
+                    retrieved_schemes = None
 
-
-                if retrieval_failed:
-
-                    error_text = (
-                        "Sorry, I couldn't search the scheme "
-                        "knowledge base right now, so I can't "
-                        "give a verified answer. Please try again "
-                        "in a moment."
+                    st.error(
+                        "Something went wrong while searching "
+                        "the scheme knowledge base."
                     )
 
-                    st.error(error_text)
+
+                # -------------------------------------------------
+                # NO RESULTS
+                # -------------------------------------------------
+
+                if retrieved_schemes is None:
+
+                    error_text = (
+                        "I couldn't retrieve verified scheme "
+                        "information right now."
+                    )
 
                     st.session_state.messages.append(
                         {
@@ -327,7 +595,9 @@ if user_question:
 
                 elif not retrieved_schemes:
 
-                    st.write(NO_CONTEXT_MESSAGE)
+                    st.write(
+                        NO_CONTEXT_MESSAGE
+                    )
 
                     st.session_state.messages.append(
                         {
@@ -339,39 +609,148 @@ if user_question:
 
                 else:
 
-                    try:
+                    # -------------------------------------------------
+                    # ELIGIBILITY EVALUATION
+                    # -------------------------------------------------
 
-                        scheme_context = build_scheme_context(
-                            retrieved_schemes
+                    user_profile = build_user_profile()
+
+                    eligibility_results = []
+
+                    for item in retrieved_schemes:
+
+                        evaluation = evaluate_eligibility(
+                            user_profile,
+                            item["scheme"]
                         )
 
-                        with st.spinner("Thinking..."):
+                        eligibility_results.append(
+                            {
+                                "scheme": item["scheme"],
+                                "similarity": item["similarity"],
+                                "evaluation": evaluation
+                            }
+                        )
+
+
+                    # -------------------------------------------------
+                    # DISPLAY ELIGIBILITY CARDS
+                    # -------------------------------------------------
+
+                    st.subheader(
+                        "Eligibility overview"
+                    )
+
+                    for result in eligibility_results:
+
+                        scheme = result["scheme"]
+                        evaluation = result["evaluation"]
+
+                        status = evaluation["status"]
+
+                        if status == "likely_eligible":
+
+                            icon = "🟢"
+
+                        elif status == "potentially_eligible":
+
+                            icon = "🟡"
+
+                        else:
+
+                            icon = "🔴"
+
+                        st.markdown(
+                            f"### {icon} {scheme.get('name', 'Scheme')}"
+                        )
+
+                        st.write(
+                            get_eligibility_summary(
+                                evaluation
+                            )
+                        )
+
+                        if evaluation["failed"]:
+
+                            st.caption(
+                                "Known issue: "
+                                + " ".join(
+                                    evaluation["failed"]
+                                )
+                            )
+
+                        if evaluation["missing_information"]:
+
+                            st.caption(
+                                "Information needed: "
+                                + ", ".join(
+                                    evaluation[
+                                        "missing_information"
+                                    ]
+                                )
+                            )
+
+
+                    # -------------------------------------------------
+                    # GEMINI GENERATION
+                    # -------------------------------------------------
+
+                    try:
+
+                        scheme_context = (
+                            build_scheme_context(
+                                retrieved_schemes
+                            )
+                        )
+
+                        eligibility_context = (
+                            build_eligibility_context(
+                                eligibility_results
+                            )
+                        )
+
+                        with st.spinner(
+                            "Preparing your personalized answer..."
+                        ):
 
                             answer = get_gemini_response(
                                 client,
                                 user_question,
-                                scheme_context
+                                scheme_context,
+                                eligibility_context
                             )
 
-                        sources = [
-                            {
-                                "name": item["scheme"].get(
-                                    "name",
-                                    "Unknown scheme"
-                                ),
-                                "official_url": item["scheme"].get(
-                                    "official_url",
-                                    "Not available"
-                                ),
-                                "source_url": item["scheme"].get(
-                                    "source_url",
-                                    "Not available"
-                                )
-                            }
-                            for item in retrieved_schemes
-                        ]
+
+                        # -------------------------------------------------
+                        # SOURCES
+                        # -------------------------------------------------
+
+                        sources = []
+
+                        for item in retrieved_schemes:
+
+                            scheme = item["scheme"]
+
+                            sources.append(
+                                {
+                                    "name": scheme.get(
+                                        "name",
+                                        "Unknown scheme"
+                                    ),
+                                    "official_url": scheme.get(
+                                        "official_url",
+                                        "Not available"
+                                    ),
+                                    "source_url": scheme.get(
+                                        "source_url",
+                                        "Not available"
+                                    )
+                                }
+                            )
+
 
                         st.write(answer)
+
 
                         for source in sources:
 
@@ -383,6 +762,7 @@ if user_question:
                                 f"{source['official_url']}"
                             )
 
+
                         st.session_state.messages.append(
                             {
                                 "role": "assistant",
@@ -391,12 +771,12 @@ if user_question:
                             }
                         )
 
+
                     except Exception:
 
                         error_text = (
                             "Sorry, something went wrong while "
-                            "generating a response. Please try "
-                            "again in a moment."
+                            "generating the response. Please try again."
                         )
 
                         st.error(error_text)
