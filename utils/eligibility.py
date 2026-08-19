@@ -6,8 +6,18 @@ against a user's profile.
 
 It does NOT use Gemini or any LLM.
 It does NOT parse free-form eligibility text.
+
+Important:
+If a scheme has no structured eligibility rules, the engine does
+not claim that the user is eligible. It returns potentially_eligible
+because eligibility cannot be fully determined from the structured
+rules available to the application.
 """
 
+
+# =========================================================
+# TEXT NORMALIZATION
+# =========================================================
 
 def normalize_text(value):
     """Normalize text for deterministic comparisons."""
@@ -24,35 +34,73 @@ def normalize_text(value):
     )
 
 
+# =========================================================
+# ELIGIBILITY EVALUATION
+# =========================================================
+
 def evaluate_eligibility(user_profile, scheme):
     """
     Evaluate a user's profile against a scheme's structured
     eligibility rules.
 
     Returns:
+
         {
             "status": "likely_eligible"
                       | "potentially_eligible"
                       | "not_eligible",
+
             "passed": [],
             "failed": [],
             "unknown": [],
             "missing_information": []
         }
+
+    Status meanings:
+
+        likely_eligible
+            All available structured conditions are satisfied.
+
+        potentially_eligible
+            Some required information is missing OR the scheme
+            has no structured eligibility rules.
+
+        not_eligible
+            At least one known structured condition has failed.
     """
 
-    rules = scheme.get("eligibility_rules", {})
+    rules = scheme.get("eligibility_rules")
+
+    # ---------------------------------------------------------
+    # NO STRUCTURED RULES
+    # ---------------------------------------------------------
+
+    if not rules:
+
+        return {
+            "status": "potentially_eligible",
+            "passed": [],
+            "failed": [],
+            "unknown": [
+                "This scheme does not currently have structured "
+                "eligibility rules in the knowledge base."
+            ],
+            "missing_information": [
+                "scheme_specific_eligibility"
+            ]
+        }
 
     passed = []
     failed = []
     unknown = []
     missing_information = []
 
-    # ---------------------------------------------------------
+    # =========================================================
     # AGE
-    # ---------------------------------------------------------
+    # =========================================================
 
     user_age = user_profile.get("age")
+
     min_age = rules.get("min_age")
     max_age = rules.get("max_age")
 
@@ -61,7 +109,8 @@ def evaluate_eligibility(user_profile, scheme):
         if user_age is None:
 
             unknown.append(
-                f"Age is required to verify the minimum age of {min_age}."
+                f"Age is required to verify the minimum age "
+                f"requirement of {min_age}."
             )
 
             if "age" not in missing_information:
@@ -84,7 +133,8 @@ def evaluate_eligibility(user_profile, scheme):
         if user_age is None:
 
             unknown.append(
-                f"Age is required to verify the maximum age of {max_age}."
+                f"Age is required to verify the maximum age "
+                f"requirement of {max_age}."
             )
 
             if "age" not in missing_information:
@@ -102,11 +152,12 @@ def evaluate_eligibility(user_profile, scheme):
                 f"Age is within the maximum limit of {max_age}."
             )
 
-    # ---------------------------------------------------------
-    # INCOME
-    # ---------------------------------------------------------
+    # =========================================================
+    # ANNUAL INCOME
+    # =========================================================
 
     user_income = user_profile.get("annual_income")
+
     max_income = rules.get("max_annual_income")
 
     if max_income is not None:
@@ -135,11 +186,12 @@ def evaluate_eligibility(user_profile, scheme):
                 f"₹{max_income:,.0f}."
             )
 
-    # ---------------------------------------------------------
+    # =========================================================
     # OCCUPATION
-    # ---------------------------------------------------------
+    # =========================================================
 
     allowed_occupations = rules.get("occupation") or []
+
     user_occupation = normalize_text(
         user_profile.get("occupation")
     )
@@ -154,7 +206,8 @@ def evaluate_eligibility(user_profile, scheme):
         if not user_occupation:
 
             unknown.append(
-                "Occupation is required to verify the occupation-specific requirement."
+                "Occupation is required to verify the "
+                "occupation-specific requirement."
             )
 
             if "occupation" not in missing_information:
@@ -163,18 +216,20 @@ def evaluate_eligibility(user_profile, scheme):
         elif user_occupation in normalized_allowed:
 
             passed.append(
-                "Occupation matches the scheme's specified occupation."
+                "Occupation matches the scheme's specified "
+                "occupation requirement."
             )
 
         else:
 
             failed.append(
-                "Occupation does not match the scheme's specified occupation requirement."
+                "Occupation does not match the scheme's "
+                "specified occupation requirement."
             )
 
-    # ---------------------------------------------------------
+    # =========================================================
     # GENDER
-    # ---------------------------------------------------------
+    # =========================================================
 
     required_gender = rules.get("gender")
 
@@ -191,7 +246,8 @@ def evaluate_eligibility(user_profile, scheme):
         if not user_gender:
 
             unknown.append(
-                "Gender is required to determine this eligibility condition."
+                "Gender is required to determine this "
+                "eligibility condition."
             )
 
             if "gender" not in missing_information:
@@ -210,9 +266,9 @@ def evaluate_eligibility(user_profile, scheme):
                 "Gender requirement is satisfied."
             )
 
-    # ---------------------------------------------------------
-    # LANDHOLDING
-    # ---------------------------------------------------------
+    # =========================================================
+    # AGRICULTURAL LANDHOLDING
+    # =========================================================
 
     requires_landholding = rules.get(
         "requires_landholding"
@@ -231,23 +287,27 @@ def evaluate_eligibility(user_profile, scheme):
             )
 
             if "has_landholding" not in missing_information:
-                missing_information.append("has_landholding")
+                missing_information.append(
+                    "has_landholding"
+                )
 
         elif has_landholding is True:
 
             passed.append(
-                "Required agricultural landholding condition is satisfied."
+                "Required agricultural landholding condition "
+                "is satisfied."
             )
 
         else:
 
             failed.append(
-                "The required agricultural landholding condition is not satisfied."
+                "The required agricultural landholding "
+                "condition is not satisfied."
             )
 
-    # ---------------------------------------------------------
+    # =========================================================
     # DISABILITY
-    # ---------------------------------------------------------
+    # =========================================================
 
     requires_disability = rules.get(
         "requires_disability"
@@ -270,12 +330,15 @@ def evaluate_eligibility(user_profile, scheme):
             )
 
             if "has_disability" not in missing_information:
-                missing_information.append("has_disability")
+                missing_information.append(
+                    "has_disability"
+                )
 
         elif has_disability is False:
 
             failed.append(
-                "The scheme requires a disability condition that is not satisfied."
+                "The scheme requires a disability condition "
+                "that is not satisfied."
             )
 
         else:
@@ -293,8 +356,8 @@ def evaluate_eligibility(user_profile, scheme):
                 if disability_percentage is None:
 
                     unknown.append(
-                        f"Disability percentage is required to verify "
-                        f"the minimum requirement of "
+                        f"Disability percentage is required to "
+                        f"verify the minimum requirement of "
                         f"{min_disability_percentage}%."
                     )
 
@@ -312,20 +375,22 @@ def evaluate_eligibility(user_profile, scheme):
                 ):
 
                     failed.append(
-                        f"Disability percentage is below the required "
-                        f"minimum of {min_disability_percentage}%."
+                        f"Disability percentage is below the "
+                        f"required minimum of "
+                        f"{min_disability_percentage}%."
                     )
 
                 else:
 
                     passed.append(
-                        f"Disability percentage satisfies the minimum "
-                        f"requirement of {min_disability_percentage}%."
+                        f"Disability percentage satisfies the "
+                        f"minimum requirement of "
+                        f"{min_disability_percentage}%."
                     )
 
-    # ---------------------------------------------------------
+    # =========================================================
     # EXISTING BUSINESS
-    # ---------------------------------------------------------
+    # =========================================================
 
     requires_existing_business = rules.get(
         "requires_existing_business"
@@ -360,9 +425,9 @@ def evaluate_eligibility(user_profile, scheme):
                 "The scheme requires an existing business."
             )
 
-    # ---------------------------------------------------------
+    # =========================================================
     # NO EXISTING HOUSE
-    # ---------------------------------------------------------
+    # =========================================================
 
     requires_no_existing_house = rules.get(
         "requires_no_existing_house"
@@ -388,8 +453,9 @@ def evaluate_eligibility(user_profile, scheme):
         elif owns_house is True:
 
             failed.append(
-                "The user owns a house, while the scheme requires "
-                "the beneficiary not to own an existing house."
+                "The user owns a house, while the scheme "
+                "requires the beneficiary not to own an "
+                "existing house."
             )
 
         else:
@@ -398,9 +464,9 @@ def evaluate_eligibility(user_profile, scheme):
                 "No existing house condition is satisfied."
             )
 
-    # ---------------------------------------------------------
+    # =========================================================
     # FINAL STATUS
-    # ---------------------------------------------------------
+    # =========================================================
 
     if failed:
 
@@ -425,9 +491,14 @@ def evaluate_eligibility(user_profile, scheme):
     }
 
 
+# =========================================================
+# HUMAN-READABLE SUMMARY
+# =========================================================
+
 def get_eligibility_summary(result):
     """
-    Convert an eligibility result into a short human-readable summary.
+    Convert an eligibility result into a short,
+    human-readable summary.
     """
 
     status = result.get("status")
@@ -441,6 +512,18 @@ def get_eligibility_summary(result):
 
     if status == "potentially_eligible":
 
+        if (
+            "scheme_specific_eligibility"
+            in result.get("missing_information", [])
+        ):
+
+            return (
+                "Potentially eligible — the available "
+                "knowledge base does not contain enough "
+                "structured eligibility rules to confirm "
+                "eligibility."
+            )
+
         return (
             "Potentially eligible — some required information "
             "is still needed to determine eligibility."
@@ -453,4 +536,6 @@ def get_eligibility_summary(result):
             "eligibility conditions."
         )
 
-    return "Eligibility could not be determined."
+    return (
+        "Eligibility could not be determined."
+    )
