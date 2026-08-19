@@ -1030,86 +1030,29 @@ if user_question:
                     # =================================================
 
                     if focused_information_question:
-
+                        # Do not print the raw knowledge-base text here.
+                        # Gemini will answer in the user's detected language,
+                        # preventing an English answer from appearing first.
                         for item in retrieved_schemes:
-
                             scheme = item["scheme"]
 
-                            if document_question:
-
-                                st.subheader(
-                                    f"📄 Documents required for "
-                                    f"{scheme.get('name', 'this scheme')}"
-                                )
-
-                                documents = scheme.get(
-                                    "required_documents"
-                                )
-
-                                if documents:
-
-                                    st.write(documents)
-
-                                else:
-
-                                    st.info(
-                                        "Required document information "
-                                        "is not available in the current "
-                                        "knowledge base."
-                                    )
-
-                            if application_question:
-
-                                st.subheader(
-                                    f"📝 How to apply for "
-                                    f"{scheme.get('name', 'this scheme')}"
-                                )
-
-                                application_process = scheme.get(
-                                    "application_process"
-                                )
-
-                                if application_process:
-
-                                    st.write(
-                                        application_process
-                                    )
-
-                                else:
-
-                                    st.info(
-                                        "Application process information "
-                                        "is not available in the current "
-                                        "knowledge base."
-                                    )
-
-                            official_url = scheme.get(
-                                "official_url"
-                            )
-
-                            source_url = scheme.get(
-                                "source_url"
-                            )
+                            official_url = scheme.get("official_url")
+                            source_url = scheme.get("source_url")
 
                             if official_url:
-
                                 st.markdown(
-                                    f"🔗 **Official portal:** "
-                                    f"{official_url}"
+                                    f"🔗 **Official portal:** {official_url}"
                                 )
 
                             if source_url:
-
                                 st.markdown(
-                                    f"📚 **Official source:** "
-                                    f"{source_url}"
+                                    f"📚 **Official source:** {source_url}"
                                 )
 
-                            st.caption(
-                                "Please verify the latest requirements "
-                                "on the official government portal because "
-                                "scheme rules can change."
-                            )
+                        st.caption(
+                            "Please verify the latest details on the official "
+                            "government portal because scheme rules can change."
+                        )
 
 
                         # -------------------------------------------------
